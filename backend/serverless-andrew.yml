@@ -1,0 +1,359 @@
+# org: andrewemadgabra
+# app: my-first-app
+
+service:
+  name: serverless-todo-app
+  
+
+plugins:
+  - serverless-webpack
+  - serverless-reqvalidator-plugin
+  - serverless-aws-documentation
+  - serverless-iam-roles-per-function
+  - serverless-plugin-tracing
+package:
+  individually: true   
+
+provider:
+  name: aws
+  runtime: nodejs12.x 
+
+  stage: ${opt:stage, 'dev'}
+  #region: ${opt:region, 'us-east-2'}
+  region: ${opt:region, 'us-east-1'}
+  #stage: ${opt:stage, self:custom.defaultStage}
+  #region: ${opt:provider, self:custom.defaultRegion} 
+  tracing:
+    lambda: true
+    apiGateway: true 
+  profile: projectDev
+  iamRoleStatements:
+    - Effect: "Allow" # xray permissions (required)
+      Action:
+        - "xray:PutTraceSegments"
+        - "xray:PutTelemetryRecords"
+      Resource:
+        - "*"
+
+  environment:
+    TODOS_TABLE: "Todos-${self:provider.stage}"
+    USERS_TODO_TABLE: "Users-Todo-${self:provider.stage}"
+    USERID_INDEX: UserIdIndex
+    TODOS_S3_BUCKET: "serverless-andrew-todos-${self:provider.stage}"
+    THUMBNAILS_S3_BUCKET: "serverless-todos-andrew-thumbnail-${self:provider.stage}"
+    SIGNED_URL_EXPIRATION: 300
+    BUCKET_REGION: ${self:provider.region}
+
+
+custom: 
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true  
+  documentation:
+    api:
+      info:
+        version: "2"
+        title: "Todo API"
+        description: "Serverless application for Todo"
+    models:
+      - 
+        name: TodoRequest
+        description: "Model for Todo Request"
+        contentType: application/json
+        schema: ${file(models/create-todo-request.json)}
+      - 
+        name: UpdateTodoRequest
+        description: "Model for Update Request"
+        contentType: application/json
+        schema: ${file(models/update-todo-request.json)}  
+
+
+functions:
+
+  RS256Auth:
+    handler: src/lambda/auth/auth0Authorizer.handler                
+    
+
+  # TODO: Configure this function
+  
+  GetTodos:
+    handler: src/lambda/http/getTodos.handler
+    events:
+      - http:
+          path: /todos
+          method: get          
+          cors: true
+          authorizer: # An AWS API Gateway custom authorizer function
+            name: RS256Auth # The name of the authorizer function (must be in this service)                              
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:Scan
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${'self:provider.environment.TODO_TABLE'}"                        
+      - Effect: Allow
+        Action:
+          - dynamodb:Scan
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${'self:provider.environment.TODO_TABLE'}/index/${self:provider.environment.USERID_INDEX}"     
+
+  # TODO: Configure this function
+  CreateTodo:
+    handler: src/lambda/http/createTodo.handler
+    events:
+      - http:
+          path: /todos
+          method: post
+          cors: true
+          authorizer: # An AWS API Gateway custom authorizer function
+            name: RS256Auth # The name of the authorizer function (must be in this service)          
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            summary: Create a new todo
+            description: Create a new todo
+            requestModels:
+              'application/json': TodoRequest                
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}"
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"       
+
+  # TODO: Configure this function             
+  UpdateTodo:
+    handler: src/lambda/http/updateTodo.handler
+    events:
+      - http:
+          path: /todos/{todoId}
+          method: patch
+          cors: true 
+          authorizer: # An AWS API Gateway custom authorizer function
+            name: RS256Auth # The name of the authorizer function (must be in this service)                             
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            summary: Update todo
+            description: Update a todo item
+            requestModels:
+              'application/json': UpdateTodoRequest                
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}"  
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"  
+
+  # TODO: Configure this function
+  DeleteTodo:
+    handler: src/lambda/http/deleteTodo.handler
+    events:
+      - http:
+          path: /todos/{todoId}
+          method: delete
+          authorizer: # An AWS API Gateway custom authorizer function
+            name: RS256Auth # The name of the authorizer function (must be in this service)           
+          cors: true                        
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:DeleteItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}"  
+      - Effect: Allow
+        Action:
+          - dynamodb:DeleteItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"           
+
+  # TODO: Configure this function
+  GenerateUploadUrl:
+    handler: src/lambda/http/generateUploadUrl.handler
+    events:
+      - http:
+          path: /todos/{todoId}/attachment
+          method: post
+          authorizer: # An AWS API Gateway custom authorizer function
+            name: RS256Auth # The name of the authorizer function (must be in this service)           
+          cors: true
+    iamRoleStatements:           
+      - Effect: Allow
+        Action:
+          - s3:GetSignedUrl
+        Resource: "arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*"     
+       
+    
+  Thumbnail:           
+    handler: src/lambda/s3/attachment.handler
+    events:
+      - sns:
+          arn: !Ref attachUrlTopic
+          topicName: 'attachUrlTopic-${self:provider.stage}'                                
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+          - s3:GetObject
+        Resource: "arn:aws:s3:::${self:provider.environment.THUMBNAILS_S3_BUCKET}/*"
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+          - s3:GetObject
+        Resource: "arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*"      
+
+           
+
+resources:
+  Resources:
+    # TODO: Add any necessary AWS resources
+    GatewayResponseDefault4XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+          gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: ApiGatewayRestApi
+
+    TodosDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TODOS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S          
+          - AttributeName: todoId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH          
+          - AttributeName: todoId
+            KeyType: RANGE 
+        BillingMode: PAY_PER_REQUEST
+
+    AttachmentsDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      DependsOn: TodosDynamoDBTable
+      Properties:
+        TableName: ${self:provider.environment.USERS_TODO_TABLE}
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        # StreamSpecification:
+          # StreamViewType: NEW_IMAGE
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.USERID_INDEX}
+            KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            Projection:
+              ProjectionType: KEYS_ONLY             
+        
+    RequestBodyValidator:
+      Type: AWS::ApiGateway::RequestValidator
+      Properties:
+        Name: 'request-body-validator'
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: true
+        ValidateRequestParameters: false     
+
+    S3BucketTodos:
+      Type: AWS::S3::Bucket 
+      Properties:
+        BucketName: ${self:provider.environment.TODOS_S3_BUCKET}   
+        NotificationConfiguration:
+          TopicConfigurations:
+            - Event: s3:ObjectCreated:Put
+              Topic: 
+                !Ref attachUrlTopic                                     
+        CorsConfiguration:
+          CorsRules:
+            -
+              AllowedOrigins:
+                - '*'
+              AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - DELETE
+                - HEAD
+              MaxAge: 3000
+
+    BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        PolicyDocument:
+          Id: MyPolicy
+          Version: "2012-10-17"
+          Statement:
+            - Sid: PublicReadForGetBucketObjects
+              Effect: Allow
+              Principal: '*'
+              Action: 
+                - "s3:GetObject"
+                - "s3:PutObject"
+                - "s3:DeleteObject"
+              Resource: 'arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*'
+        Bucket: !Ref S3BucketTodos 
+
+    S3BucketThumbnail:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
+    ThumbnailPermissionS3:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref  ThumbnailLambdaFunction
+        Principal: s3.amazonaws.com
+        Action: lambda:InvokeFunction
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: arn:aws:s3:::${self:provider.environment.THUMBNAILS_S3_BUCKET}
+
+    ThumbnailBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        PolicyDocument:
+          Id: MyPolicy
+          Version: "2012-10-17"
+          Statement:
+            - Sid: PublicReadForGetResizePhotosBucketObjects
+              Effect: Allow
+              Principal: '*'
+              Action: 
+                - "s3:GetObject"
+                - "s3:PutObject"
+              Resource: "arn:aws:s3:::${self:provider.environment.THUMBNAILS_S3_BUCKET}/*"
+        Bucket: !Ref S3BucketThumbnail         
+        
+    attachUrlTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: 'Attach URL topic'
+        TopicName: 'attachUrlTopic-${self:provider.stage}'
+
+    attachUrlTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      DependsOn:
+        - attachUrlTopic      
+      Properties:
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: AllowServerlessFrameworkEnterpriseToPublish
+              Effect: Allow
+              Principal:
+                AWS: '*'
+              Action: 'sns:Publish'
+              Resource:
+                Ref: attachUrlTopic               
+        Topics:
+          - !Ref attachUrlTopic  
