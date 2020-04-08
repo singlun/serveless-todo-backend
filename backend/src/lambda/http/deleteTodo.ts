@@ -16,20 +16,17 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   
   logger.info('User Todoid', {toId: todoId})
 
-  //Extract JWT Token From the Authoriztion Header
-  const authorization = event.headers.Authorization
-  const split = authorization.split(' ')
-  const jwtToken = split[1]
-
   //Delete User's Todo Item
-  await deleteUserTodos(todoId, jwtToken)
+  await deleteUserTodos(todoId)
 
   // Return the New Item Result back to the Client
   return {
     statusCode: 201,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
+      'Access-Control-Allow-Credentials': true,
+      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+      'Access-Control-Allow-Methods': 'GET,OPTIONS,POST',
     },
     body: JSON.stringify({
       item: {}

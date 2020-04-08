@@ -20,10 +20,6 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   //const items: TodoItem[] = await getUserTodos(jwtToken) 
   const userTodoItems: TodoItem[] = await getUserTodos(jwtToken) 
 
-
-
-
-  //const itemsEmpty: TodoItem[] = [] 
   let items = JSON.parse(JSON.stringify(userTodoItems))
 
   logger.info('User Todo items', items)
@@ -35,6 +31,8 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Credentials': true,
+      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+      'Access-Control-Allow-Methods': 'GET,OPTIONS,POST',
     },
     body: JSON.stringify({
      items

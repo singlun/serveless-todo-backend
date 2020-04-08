@@ -24,10 +24,13 @@ provider:
   profile: projectDev
 
   environment:
+    USERS_TABLE: Users-${self:provider.stage}
+    TODOS_TABLE: Todos-${self:provider.stage}
     USERS_TODO_TABLE: "Users-Todo-${self:provider.stage}"
+    TODOID_INDEX: TodoIdIndex
     USERID_INDEX: UserIdIndex
-    TODOS_S3_BUCKET: "serverless-andrew-todos-${self:provider.stage}"
-    THUMBNAILS_S3_BUCKET: "serverless-todos-andrew-thumbnail-${self:provider.stage}"
+    TODOS_S3_BUCKET: "serverless-udacity-todos-${self:provider.stage}"
+    THUMBNAILS_S3_BUCKET: "serverless-todos-udacity-thumbnail-${self:provider.stage}"
     SIGNED_URL_EXPIRATION: 300
     BUCKET_REGION: ${self:provider.region}
 
@@ -75,12 +78,12 @@ functions:
     iamRoleStatements:
       - Effect: Allow
         Action:
-          - dynamodb:Scan
-        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${'self:provider.environment.USERS_TODO_TABLE'}"                        
+          - dynamodb:Query
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"                        
       - Effect: Allow
         Action:
-          - dynamodb:Scan
-        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${'self:provider.environment.USERS_TODO_TABLE'}/index/${self:provider.environment.USERID_INDEX}"     
+          - dynamodb:Query
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.USERID_INDEX}"     
 
   # TODO: Configure this function
   CreateTodo:
@@ -99,6 +102,14 @@ functions:
             requestModels:
               'application/json': TodoRequest                
     iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}       
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}       
       - Effect: Allow
         Action:
           - dynamodb:PutItem
@@ -124,6 +135,15 @@ functions:
       - Effect: Allow
         Action:
           - dynamodb:UpdateItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}       
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+          - dynamodb:GetItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}       
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
         Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"  
 
 
@@ -138,6 +158,15 @@ functions:
             name: RS256Auth # The name of the authorizer function (must be in this service)           
           cors: true                        
     iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:DeleteItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}        
+      - Effect: Allow
+        Action:
+          - dynamodb:DeleteItem
+          - dynamodb:GetItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}      
       - Effect: Allow
         Action:
           - dynamodb:DeleteItem
@@ -176,7 +205,20 @@ functions:
         Action:
           - s3:PutObject
           - s3:GetObject
-        Resource: "arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*"      
+        Resource: "arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*"  
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}         
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+          - dynamodb:GetItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}       
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"              
 
            
 
@@ -194,6 +236,40 @@ resources:
         RestApiId:
           Ref: ApiGatewayRestApi
 
+    UserDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S            
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH            
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.USERID_INDEX}
+            KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            Projection:
+              ProjectionType: KEYS_ONLY 
+        BillingMode: PAY_PER_REQUEST   
+        TableName: ${self:provider.environment.USERS_TABLE}         
+
+
+    TodosDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: todoId
+            AttributeType: S            
+        KeySchema:
+          - AttributeName: todoId
+            KeyType: HASH            
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:provider.environment.TODOS_TABLE}          
+
     AttachmentsDynamoDBTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -207,7 +283,7 @@ resources:
         StreamSpecification:
           StreamViewType: NEW_IMAGE
         GlobalSecondaryIndexes:
-          - IndexName: ${self:provider.environment.USERID_INDEX}
+          - IndexName: ${self:provider.environment.TODOID_INDEX}
             KeySchema:
             - AttributeName: userId
               KeyType: HASH
