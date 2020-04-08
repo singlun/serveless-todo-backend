@@ -30,7 +30,11 @@ export class TodoAccess {
     var params = {
       TableName: this.usersTable,
       IndexName: this.userIndex,
-      KeyConditionExpression:  "userId = :userId",    
+      ProjectionExpression: "userId, todoId,  createdAt, #name, dueDate, done, attachmentUrl",
+      KeyConditionExpression:  "userId = :userId", 
+      ExpressionAttributeNames:{
+        "#name": "name"
+      },         
       ExpressionAttributeValues: {
           ":userId": userId
       }
@@ -38,10 +42,10 @@ export class TodoAccess {
 
     //Query the Todos Records From the dynamoDb.
     //Please note that query is used because the a Global index
-    //is applied to the Todos Table.    
+    //is applied to the users Table.    
     const result = await this.docClient.query(params).promise();
     const items = result.Items
-    logger.info('getUserTodos', items)
+    logger.info('getUserTodos', JSON.parse(JSON.stringify(result.Items)))
     return items as TodoItem[]
   }  
 
