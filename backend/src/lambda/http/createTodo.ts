@@ -20,7 +20,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   const authorization = event.headers.Authorization
   const split = authorization.split(' ')
   const jwtToken = split[1]
-  
+  const thumbnailBucketName = process.env.THUMBNAILS_S3_BUCKET
 
   //Generate unique Id
   const todoId = uuid.v4()
@@ -36,7 +36,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
                                             name: newTodo.name,
                                             dueDate: newTodo.dueDate,
                                             done: false,
-                                            attachmentUrl: null,
+                                            attachmentUrl: `https://${thumbnailBucketName}.s3.amazonaws.com/${todoId}.jpeg`,
                                       })
 
   logger.info('New Item', newTodoItems) 

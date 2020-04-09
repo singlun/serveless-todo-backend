@@ -14,9 +14,7 @@ export class TodoAccess {
     private readonly docClient: DocumentClient = createDynamoDBClient(),
 
     //Retrieve the Evironment Variables For all the Resources
-    private readonly usersTable = process.env.USERS_TABLE,
     private readonly todosTable = process.env.TODOS_TABLE,
-    private readonly userIndex = process.env.USERID_INDEX,
     private readonly userTodosTable = process.env.USERS_TODO_TABLE,
     private readonly bucketName = process.env.TODOS_S3_BUCKET,
     private readonly expires = process.env.SIGNED_URL_EXPIRATION,        
@@ -26,36 +24,23 @@ export class TodoAccess {
 
   async getUserTodos(userId: string): Promise<TodoItem[]> {
 
-    //Query method to search for items. 
     var params = {
-      TableName: this.usersTable,
-      IndexName: this.userIndex,
-      ProjectionExpression: "userId, todoId,  createdAt, #name, dueDate, done, attachmentUrl",
-      KeyConditionExpression:  "userId = :userId", 
-      ExpressionAttributeNames:{
-        "#name": "name"
-      },         
+      TableName: this.userTodosTable,  
+      KeyConditionExpression:  "userId = :userId and begins_with (createdAt, :dt)",      
       ExpressionAttributeValues: {
-          ":userId": userId
+          ":userId": userId,
+          ":dt": new Date().toISOString().substring(0,10)
       }
     };
 
-    //Query the Todos Records From the dynamoDb.
-    //Please note that query is used because the a Global index
-    //is applied to the users Table.    
     const result = await this.docClient.query(params).promise();
     const items = result.Items
-    logger.info('getUserTodos', JSON.parse(JSON.stringify(result.Items)))
+    logger.info('getUserTodos', items)
     return items as TodoItem[]
   }  
 
 
-  async createTodo(todo: TodoItem): Promise<TodoItem> {
-
-    await this.docClient.put({
-      TableName: this.usersTable,
-      Item: todo
-    }).promise()     
+  async createTodo(todo: TodoItem): Promise<TodoItem> {     
     
     await this.docClient.put({
       TableName: this.todosTable,
@@ -77,18 +62,18 @@ export class TodoAccess {
       Key: {
         'todoId': {todoId: todoId}
       },
-      ProjectionExpression: 'todoId'
+      ProjectionExpression: 'todoId, createdAt'
     };    
 
     const result = await this.docClient.get(paramsUser).promise();
-    const user = JSON.parse(JSON.stringify(result.Item))      
+    // const user = JSON.parse(JSON.stringify(result.Item))      
 
     //Parameters For deleting the User Todo'S Records.
     var params = {
       TableName:this.userTodosTable,
       Key:{
-          "userId": {userId: user.userId},
-          "todoId": {todoId: todoId}         
+          "userId": {userId: result.Item.userId},
+          "createdAt": {createdAt: result.Item.createdAt},         
       }
     };
 
@@ -99,18 +84,9 @@ export class TodoAccess {
       Key:{
           "todoId": {todoId: todoId}         
       }
-    };
+    };   
 
     await this.docClient.delete(params2).promise();
-
-    var params3 = {
-      TableName:this.usersTable,
-      Key:{
-          "userId": {userId: user.userId},       
-      }
-    };
-
-    await this.docClient.delete(params3).promise();    
 
   }
 
@@ -121,21 +97,20 @@ export class TodoAccess {
       Key: {
         'todoId': {todoId: todoId}
       },
-      ProjectionExpression: 'todoId'
+      ProjectionExpression: 'userId, createdAt'
     };    
 
     const result = await this.docClient.get(paramsUser).promise();
-    const user = JSON.parse(JSON.stringify(result.Item))   
 
     const params = {
       TableName: this.userTodosTable,
       Key:{
-        "userId": {userId: user.userId},
-        "todoId": todoId 
+        "userId": {userId: result.Item.userId},
+        "createdAt": {createdAt: result.Item.createdAt},
       },
       UpdateExpression: "set attachmentUrl = :r",     
       ExpressionAttributeValues:{
-          ":userId":user,
+          ":createdAt":result.Item.createdAt,
           ":todoId":todoId,
           ":r":uploadUrl
       },
@@ -155,20 +130,7 @@ export class TodoAccess {
       },
     };
 
-    await this.docClient.update(params2).promise();  
-    
-    const params3 = {
-      TableName: this.usersTable,
-      Key:{
-          "userId": {userId: user.userId}
-      },
-      UpdateExpression: "set attachmentUrl = :r",     
-      ExpressionAttributeValues:{
-          ":r":uploadUrl
-      },
-    };
-
-    await this.docClient.update(params3).promise();     
+    await this.docClient.update(params2).promise();     
  
   }
 
@@ -197,18 +159,17 @@ export class TodoAccess {
       Key: {
         'todoId': {todoId: todoId}
       },
-      ProjectionExpression: 'todoId'
+      ProjectionExpression: 'userId, createdAt'
     };    
 
     const result = await this.docClient.get(paramsUser).promise();
-    const user = JSON.parse(JSON.stringify(result.Item))    
 
     // Parameters setting for Updating User's Todo Item.
     const params = {
       TableName: this.userTodosTable,
       Key:{
-        "userId": {userId: user.UserId},
-        "todoId": {todoId: todoId},
+        "userId": {userId: result.Item.UserId},
+        "createdAt": {createdAt: result.Item.createdAt},
       },
       UpdateExpression: "set #name = :r, dueDate=:p, done=:a",
       ExpressionAttributeNames:{
@@ -241,25 +202,7 @@ export class TodoAccess {
       },
     };
 
-    await this.docClient.update(params2).promise();   
-    
-    const params3 = {
-      TableName: this.usersTable,
-      Key:{
-          "userId": {userId: user.userId}
-      },
-      UpdateExpression: "set #name = :r, dueDate=:p, done=:a",
-      ExpressionAttributeNames:{
-        "#name": "name"
-      },       
-      ExpressionAttributeValues:{
-          ":r":todo.name,
-          ":p":todo.dueDate,
-          ":a":todo.done
-      },
-    };
-
-    await this.docClient.update(params3).promise();      
+    await this.docClient.update(params2).promise();        
 
   }
 

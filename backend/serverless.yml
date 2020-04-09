@@ -21,13 +21,11 @@ provider:
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-2'}
 
-  profile: projectDev
+  # profile: projectDev
 
   environment:
-    USERS_TABLE: Users-${self:provider.stage}
     TODOS_TABLE: Todos-${self:provider.stage}
     USERS_TODO_TABLE: "Users-Todo-${self:provider.stage}"
-    TODOID_INDEX: TodoIdIndex
     USERID_INDEX: UserIdIndex
     TODOS_S3_BUCKET: "serverless-udacity-todos-${self:provider.stage}"
     THUMBNAILS_S3_BUCKET: "serverless-todos-udacity-thumbnail-${self:provider.stage}"
@@ -79,11 +77,12 @@ functions:
       - Effect: Allow
         Action:
           - dynamodb:Query
-        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}"                        
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}"
       - Effect: Allow
         Action:
           - dynamodb:Query
-        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}/index/${self:provider.environment.USERID_INDEX}"     
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TODO_TABLE}/index/${self:provider.environment.USERID_INDEX}"     
+
 
   # TODO: Configure this function
   CreateTodo:
@@ -101,11 +100,7 @@ functions:
             description: Create a new todo
             requestModels:
               'application/json': TodoRequest                
-    iamRoleStatements:
-      - Effect: Allow
-        Action:
-          - dynamodb:PutItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}       
+    iamRoleStatements:   
       - Effect: Allow
         Action:
           - dynamodb:PutItem
@@ -131,11 +126,7 @@ functions:
             description: Update a todo item
             requestModels:
               'application/json': UpdateTodoRequest                
-    iamRoleStatements:
-      - Effect: Allow
-        Action:
-          - dynamodb:UpdateItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}       
+    iamRoleStatements:      
       - Effect: Allow
         Action:
           - dynamodb:UpdateItem
@@ -157,11 +148,7 @@ functions:
           authorizer: # An AWS API Gateway custom authorizer function
             name: RS256Auth # The name of the authorizer function (must be in this service)           
           cors: true                        
-    iamRoleStatements:
-      - Effect: Allow
-        Action:
-          - dynamodb:DeleteItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}        
+    iamRoleStatements:      
       - Effect: Allow
         Action:
           - dynamodb:DeleteItem
@@ -205,11 +192,7 @@ functions:
         Action:
           - s3:PutObject
           - s3:GetObject
-        Resource: "arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*"  
-      - Effect: Allow
-        Action:
-          - dynamodb:UpdateItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}         
+        Resource: "arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*"          
       - Effect: Allow
         Action:
           - dynamodb:UpdateItem
@@ -235,27 +218,7 @@ resources:
         ResponseType: DEFAULT_4XX
         RestApiId:
           Ref: ApiGatewayRestApi
-
-    UserDynamoDBTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        AttributeDefinitions:
-          - AttributeName: userId
-            AttributeType: S            
-        KeySchema:
-          - AttributeName: userId
-            KeyType: HASH            
-        StreamSpecification:
-          StreamViewType: NEW_IMAGE
-        GlobalSecondaryIndexes:
-          - IndexName: ${self:provider.environment.USERID_INDEX}
-            KeySchema:
-            - AttributeName: userId
-              KeyType: HASH
-            Projection:
-              ProjectionType: ALL 
-        BillingMode: PAY_PER_REQUEST   
-        TableName: ${self:provider.environment.USERS_TABLE}         
+      
 
 
     TodosDynamoDBTable:
@@ -277,18 +240,22 @@ resources:
         AttributeDefinitions:
           - AttributeName: userId
             AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S            
         KeySchema:
           - AttributeName: userId
             KeyType: HASH
+          - AttributeName: createdAt
+            KeyType: RANGE            
         StreamSpecification:
           StreamViewType: NEW_IMAGE
         GlobalSecondaryIndexes:
-          - IndexName: ${self:provider.environment.TODOID_INDEX}
+          - IndexName: ${self:provider.environment.USERID_INDEX}
             KeySchema:
             - AttributeName: userId
               KeyType: HASH
             Projection:
-              ProjectionType: KEYS_ONLY 
+              ProjectionType: ALL 
         BillingMode: PAY_PER_REQUEST                          
         
     RequestBodyValidator:
