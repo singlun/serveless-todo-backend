@@ -177,10 +177,10 @@ export class TodoAccess {
         "#name": "name"
       },       
       ExpressionAttributeValues:{
-          ":r":todo.name,
-          ":p":todo.dueDate,
-          ":a":todo.done
-      },
+          ":r": todo.name,
+          ":p": todo.dueDate,
+          ":a": !todo.done
+      }
     };
 
 
@@ -199,7 +199,7 @@ export class TodoAccess {
       ExpressionAttributeValues:{
           ":r":todo.name,
           ":p":todo.dueDate,
-          ":a":todo.done
+          ":a":!todo.done
       },
     };
 
