@@ -9,7 +9,10 @@ const logger = createLogger('deleteTodo')
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
 
   logger.info('Event Processing', {event: event.body})
-
+  //Extract JWT Token From the Authoriztion Header
+  const authorization = event.headers.Authorization
+  const split = authorization.split(' ')
+  const jwtToken = split[1]
   //Get the TodoId From the Query String
   const todoId = event.pathParameters.todoId
 
@@ -17,7 +20,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   logger.info('User Todoid', {toId: todoId})
 
   //Delete User's Todo Item
-  await deleteUserTodos(todoId)
+  await deleteUserTodos(todoId,jwtToken)
 
   // Return the New Item Result back to the Client
   return {

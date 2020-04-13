@@ -1,7 +1,7 @@
 import { SNSHandler, SNSEvent, S3Event } from 'aws-lambda'
 import 'source-map-support/register'
 import { createLogger } from '../../utils/logger'
-import { attachTodoUrl, processImage } from '../../businessLogic/todo'
+import { processImage } from '../../businessLogic/todo'
 
 const logger = createLogger('attachimageUrl')
 
@@ -36,7 +36,7 @@ export const handler: SNSHandler = async (event: SNSEvent) => {
 
     logger.info('imageUrl', {imageUrl})    
 
-    await attachTodoUrl(imageUrl, key) 
+    //await attachTodoUrl(imageUrl, key) 
        
   }
 }
