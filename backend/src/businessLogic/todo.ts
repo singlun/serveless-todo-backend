@@ -1,7 +1,6 @@
 import { TodoItem } from '../models/TodoItem'
 import { TodoAccess } from '../dataLayer/todosAccess'
 import { parseUserId } from '../auth/utils'
-import { TodoUpdate } from '../models/TodoUpdate'
 
 const todoAccess = new TodoAccess()
 
@@ -31,7 +30,7 @@ export async function createTodo(
 
 export async function updateUserTodo(
   todo: TodoItem
-): Promise<string>{
+): Promise<string> {
   return await todoAccess.updateUserTodo(todo)
 }
 

@@ -1,7 +1,7 @@
 import * as AWS  from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { TodoItem } from '../models/TodoItem'
-import { TodoUpdate } from '../models/TodoUpdate'
+const util = require('util')
 import { createLogger } from '../utils/logger'
 
 const logger = createLogger('Todo DataAcess')
@@ -86,49 +86,39 @@ export class TodoAccess {
   }
 
 
-  updateUserTodo(todo: TodoItem): string {
+  async updateUserTodo(todo: TodoItem): Promise<string> {
 
-    const params = {
-          "TableName": this.userTodosTable,
-          "Key": {
-            "userId": {
-              "S": todo.userId
-            },
-            "todoId": {
-              "S": todo.todoId
-            }
-          },
-          "UpdateExpression": "SET #dueDate = :dueDate, #name = :name, #done = :done",
-          "ExpressionAttributeValues": {
-            ":dueDate": {
-              "S": todo.dueDate
-            },
-            ":name": {
-              "S": todo.name
-            },
-            ":done": {
-              "BOOL": todo.done
-            }
-          },
-          "ExpressionAttributeNames": {
-            "#dueDate": "dueDate",
-            "#name": "name",
-            "#done": "done",
-          },
-          ReturnValues:"UPDATED_NEW"
-        };
+    var params = {
+      TableName: this.userTodosTable,
+      Key: { userId : todo.userId, todoId : todo.todoId},
+      UpdateExpression: 'set #name = :x , dueDate = :u , done = :d ',
+      ExpressionAttributeNames: {'#name' : 'name'},
+      ExpressionAttributeValues: {
+        ':x' : todo.name,
+        ':u' : todo.dueDate,
+        ':d' : todo.done,
+      }
+    };
+    
+   let documentClient = new AWS.DynamoDB.DocumentClient();
 
-        this.docClient.update(params, function(err, data) {
-          if (err) {
-              logger.info("Unable to update item. Error JSON:", JSON.stringify(err, null, 2));
-          } else {
-              logger.info("UpdateItem succeeded:", JSON.stringify(data, null, 2));
-              return JSON.stringify(data, null, 2);
-          }
-        });
+   const promise =  new Promise( function(resolve, reject) {
+                        documentClient.update(params, function(err, data) {
+                          if (err) {
+                              console.log(err);
+                              reject(JSON.stringify({error: err.message}));
+                          }
+                          else { 
+                              console.log("Todo Item Successfully commited", data);
+                              resolve(JSON.stringify(data));
+                          }
+                        }); 
+                    });
 
-        return null;
-  
+    const updateItem: any = await promise;
+
+    return updateItem;
+
   }
 
   async processTodoImage(key: string) {
@@ -172,7 +162,7 @@ export class TodoAccess {
 
 function createDynamoDBClient() {
 
-  return new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'})
+  return new AWS.DynamoDB.DocumentClient()
 
 }
 

@@ -3,7 +3,6 @@ import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } f
 import { createLogger } from '../../utils/logger'
 import { updateUserTodo } from '../../businessLogic/todo'
 import { TodoUpdate } from '../../models/TodoUpdate'
-import { TodoItem } from '../../models/TodoItem'
 import { parseUserId } from '../../auth/utils'
 
 
@@ -25,7 +24,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   //Extract the UserId From the jwt Token
   const userId = parseUserId(jwtToken)
 
-  const updateItem: string = await updateUserTodo({
+    let updateItem: any = await updateUserTodo({
                         userId,
                         todoId,
                         createdAt: new Date().toISOString(),
@@ -36,9 +35,9 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
                     });
 
 
-  let items = JSON.parse(updateItem)
+  logger.info('User Todo items', updateItem);                                      
 
-  logger.info('User Todo items', items)                                      
+  updateItem = JSON.parse(updateItem);
 
   // Return the Updated Item Result back to the Client                        
   return {
@@ -49,6 +48,6 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
       'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
       'Access-Control-Allow-Methods': 'GET,OPTIONS,POST',
     },
-    body: JSON.stringify({items})
+    body: JSON.stringify({updateItem})
   }
 }
