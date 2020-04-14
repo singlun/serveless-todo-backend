@@ -6,7 +6,7 @@ import { TodoUpdate } from '../../models/TodoUpdate'
 import { parseUserId } from '../../auth/utils'
 
 
-const logger = createLogger('deleteTodo')
+const logger = createLogger('updateTodo')
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   
@@ -35,7 +35,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
                     });
 
 
-  logger.info('User Todo items', updateItem);                                      
+  logger.info('User Todo items', {updateItem: JSON.parse(updateItem)});                                      
 
   updateItem = JSON.parse(updateItem);
 

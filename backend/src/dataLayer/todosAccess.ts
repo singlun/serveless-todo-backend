@@ -1,7 +1,6 @@
 import * as AWS  from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { TodoItem } from '../models/TodoItem'
-const util = require('util')
 import { createLogger } from '../utils/logger'
 
 const logger = createLogger('Todo DataAcess')
@@ -97,7 +96,8 @@ export class TodoAccess {
         ':x' : todo.name,
         ':u' : todo.dueDate,
         ':d' : todo.done,
-      }
+      },
+      ReturnValues: "ALL_NEW"
     };
     
    let documentClient = new AWS.DynamoDB.DocumentClient();

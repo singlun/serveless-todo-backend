@@ -35,8 +35,6 @@ export const handler: SNSHandler = async (event: SNSEvent) => {
     
 
     logger.info('imageUrl', {imageUrl})    
-
-    //await attachTodoUrl(imageUrl, key) 
        
   }
 }
